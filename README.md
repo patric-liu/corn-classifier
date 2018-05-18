@@ -58,7 +58,7 @@ It could just be the foreign object category with all the issues. Or, it could b
 ### appendix
 
 1)
-
+``
 guesses for background
 
 name: capuchin                        occurances: 1      average confidence: 0.073    confidence std: 0.000
@@ -281,9 +281,9 @@ name: solar_dish                      occurances: 1      average confidence: 0.0
 name: European_gallinule              occurances: 1      average confidence: 0.035    confidence std: 0.000
 name: crash_helmet                    occurances: 1      average confidence: 0.079    confidence std: 0.000
 name: pineapple                       occurances: 1      average confidence: 0.176    confidence std: 0.000
-
+``
 2)
-
+``
 Train on 178 samples, validate on 67 samples
 Epoch 1/20
 178/178 [==============================] - 17s 98ms/step - loss: 11.2994 - acc: 0.2584 - val_loss: 13.4718 - val_acc: 0.1642
@@ -326,3 +326,4 @@ Epoch 19/20
 Epoch 20/20
 178/178 [==============================] - 12s 66ms/step - loss: 4.0352 - acc: 0.7247 - val_loss: 4.4792 - val_acc: 0.7015
 No of errors = 20/67
+``
