@@ -12,3 +12,4 @@ The snapshots will be saved in /annotation_snapshots
 ## dependencies
 
 xmltodict - pip3 install xmltodict
+cv2
