@@ -9,6 +9,8 @@ A simple script to extract individual elements from annotated frames
 3) run script 
 The snapshots will be saved in /annotation_snapshots
 
+note: make sure the /annotation_snapshots and /annotations folders are in the same directory as makesnapshots.py before running it
+
 ## dependencies
 
 xmltodict - pip3 install xmltodict
