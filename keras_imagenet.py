@@ -1,102 +1,170 @@
-from keras.applications.resnet50 import ResNet50
-from keras.preprocessing import image
-from keras.applications.resnet50 import preprocess_input, decode_predictions
 import numpy as np
+import matplotlib.pyplot as plt
+import keras
+from keras.utils import to_categorical
 import os
-import glob
-
-model = ResNet50(weights='imagenet')
-model.summary()
-##########################################################
-# parameters
-
-topn = 2  # number of top guesses to consider
+from keras.preprocessing.image import ImageDataGenerator, load_img
+from keras.applications import ResNet50
+from time import time
+from keras.callbacks import TensorBoard
 
 
-##########################################################
-# folder names
-labels = ['background','braceroot','foreignobject','ground','leaf','stem']
+res_conv = ResNet50(weights='imagenet',
+                 include_top=False,
+                 input_shape=(224, 224, 3))
+res_conv.summary()  # Display Resnet50 model structure
 
-''' track what the network guesses for each label
-first guess, second guess etc are stored in seperate dictionaries
-dic_first_guess = {
-    label1: [num_guesses, [confidence1,confidence2,...confidencen]]
-    label2: [num_guesses, [confidence1,confidence2]]
-}'''
+print('\n', '\n', '\n')
 
-results = []
+##########################################################################
+debug = False
+num_labels = 2  # number of categories for the data
+epochs = 10000
+learning_rate = 3e-6
+fc_size = 128
 
-for index, label in enumerate(labels):
-    # loop for each label 
+nTrain = 250  # number of images to train on each epoch
+nVal = 250  # numer of images to evaluate model on
+batch_size = 25  # minibatch size
+training_batch_size = 10
+##########################################################################
 
-    print('reading {} files (Index: {})'.format(label,index))
-    path = os.path.dirname(__file__) + '/clean-dataset/train/' + label
+if debug:
+    nTrain, nVal, batch_size, num_labels = 15, 6, 3, 3
+    path = os.path.dirname(__file__) + '/debug-dataset'
+else:
+    # Location of training data and validation data
+    path = os.path.dirname(__file__) + '/clean-dataset-backup'
 
-    # create list of dictionaries
-    pre_dict = []
-    for n in range(topn):
-        prediction = {}
-        pre_dict.append(prediction)
+train_dir = path + '/train'
+validation_dir = path + '/validation'
 
-    for filepath in glob.glob(os.path.join(path, '*png')):
-        # loop for each photo in a label's folder
 
-        # feed image through net and store predictions in 'predictions'
-        img_path = filepath
-        img = image.load_img(img_path, target_size=(224, 224))
-        preds = model.predict(preprocess_input(
-            x=np.expand_dims(image.img_to_array(img), axis=0)))
-        predictions = decode_predictions(preds, top=topn)[0]
+datagen = ImageDataGenerator(rescale = 1./255.) 
 
-        # record prediction information into dictionary
-        for index, p in enumerate(predictions):
-            # loops through first guess, second guess etc..
-            label = p[1]
-            # add 1 to and store confidence in label 'p[1]'
-            try:
-                pre_dict[index][label][0] = pre_dict[index][label][0] + 1
-                pre_dict[index][label][1].append(p[2])
-            except KeyError:
-                pre_dict[index][label] = [1,[p[2]]]
-    results.append(pre_dict)
+nTrain = nTrain - nTrain % batch_size
+nVal = nVal - nVal % batch_size
 
-''' 
-Creates a dictionary for each groundtruth label containing the prediction information
-Essentially just removes information about the guess order (first guess, second guess)
+if debug:
+    nTrain, nVal, batch_size = 15, 6, 3
+
+
+''' since this is using transfer learning, the downloaded model does not contain
+the final fully connected later nor the output layer. Because the convolution 
+weights remain untouched and will have the same output for the same images before 
+and after training, we find the 'output' of these convolution layers for 
+each of the training and validation images and save these to reuse during training
 '''
-all_guesses = []
-for label in results:
-    guesses = {}
-    for guess_n in label:
-        for key,value in guess_n.items():
-            try:
-                guesses[key][0] = guesses[key][0] + value[0]
-                guesses[key][1] = guesses[key][1] + value[1]
-            except KeyError:
-                guesses[key] = value
-    all_guesses.append(guesses)
 
-''' 
-Turns dictionary into a list and also calculates the mean and std of the confidences
-'''
-outputs = []
-for label in all_guesses:
-    label_output = []
-    for key,value in label.items():
-        name = key
-        occurances = value[0]
-        mean = np.mean(value[1])
-        standard_deviation = np.std(value[1])
-        output = [name,occurances,mean,standard_deviation]
-        label_output.append(output)
-    outputs.append(label_output)
+# Find outputs for training data
+train_features = np.zeros(shape=(nTrain, 1, 1, 2048)) 
+train_labels = np.zeros(shape=(nTrain, num_labels)) 
+train_generator = datagen.flow_from_directory(
+    train_dir,
+    target_size=(224, 224),
+    batch_size=batch_size,
+    class_mode='categorical',
+    shuffle=True)
+i = 0
+for inputs_batch, labels_batch in train_generator:
+    if i * batch_size >= nTrain:
+        break
+    print('[train] gathering features for batch',i)
+    features_batch = res_conv.predict(inputs_batch)
+    train_features[i * batch_size: (i + 1) * batch_size] = features_batch
+    train_labels[i * batch_size: (i + 1) * batch_size] = labels_batch
+    i += 1
+train_features = np.reshape(train_features, (nTrain, 1 * 1 * 2048))
 
-''' 
-Print results
+# find outputs for validation data
+validation_features = np.zeros(shape=(nVal, 1, 1, 2048))
+validation_labels = np.zeros(shape=(nVal, num_labels))
+validation_generator = datagen.flow_from_directory(
+    validation_dir,
+    target_size=(224, 224),
+    batch_size=batch_size,
+    class_mode='categorical',
+    shuffle=False)
+i = 0
+for inputs_batch, labels_batch in validation_generator:
+    if i * batch_size >= nVal:
+        break
+    print('[eval] gathering features for batch', i)
+    features_batch = res_conv.predict(inputs_batch)
+    validation_features[i * batch_size: (i + 1) * batch_size] = features_batch
+    validation_labels[i * batch_size: (i + 1) * batch_size] = labels_batch
+    i += 1
+
+validation_features = np.reshape(validation_features, (nVal, 1 * 1 * 2048))
+
+''' Now we add in a fully connected layer and output layer to complete the model
+If we take the output of the convolution layers of the ResNet as the input to these
+new layers, we are just creating a simple 1 hidden layer network
 '''
-print('\n','\n','\n')
-for label_output,label in zip(outputs,labels):
-    print('guesses for {}'.format(label) + '\n')
-    for output in label_output:
-        print('name: '+str(output[0]).ljust(30),' occurances: '+str(output[1]).ljust(5),' average confidence: '+"{0:.3f}".format(output[2]) .ljust(7),' confidence std: '+"{0:.3f}".format(output[3]))
-    print('\n','\n')
+from keras import models
+from keras import layers
+from keras import optimizers
+
+# Create the model
+model = models.Sequential()
+model.add(layers.Dense(fc_size, activation='relu', input_dim=1 * 1 * 2048))
+model.add(layers.Dropout(0.3))
+model.add(layers.Dense(num_labels, activation='softmax'))
+
+# Choose the optimizer
+model.compile(optimizer=optimizers.RMSprop(lr=learning_rate),
+              loss='categorical_crossentropy',
+              metrics=['acc'])
+
+# terminal: tensorboard --logdir=logs/
+# browser: http://localhost:6006/
+tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
+
+
+# Train the model
+history = model.fit(train_features,
+                    train_labels,
+                    epochs=epochs,
+                    batch_size=training_batch_size,
+                    validation_data=(validation_features, validation_labels),
+                    callbacks=[tensorboard])
+
+# save model weights then architecture
+from keras.models import model_from_json
+print('saving')
+model.save_weights('model_weights.h5')
+with open('model_architecture.json', 'w') as f:
+    f.write(model.to_json())
+
+fnames = validation_generator.filenames
+ground_truth = validation_generator.classes
+label2index = validation_generator.class_indices
+
+# Getting the mapping from class index to class label
+idx2label = dict((v, k) for k, v in label2index.items())
+print(idx2label)
+
+
+# Evaluate model on evaluation dataset
+predictions = model.predict_classes(validation_features)
+prob = model.predict(validation_features)
+errors = np.where(predictions != ground_truth)[0]
+
+# Number of errors BROKEN
+# print("No of errors = {}/{}".format(len(errors), nVal))
+
+
+# by extension also broken
+'''for i in range(len(errors)):
+    pred_class = np.argmax(prob[errors[i]])
+    pred_label = idx2label[pred_class]
+
+    print('Original label:{}, Prediction :{}, confidence : {:.3f}'.format(
+        fnames[errors[i]].split('/')[0],
+        pred_label,
+        prob[errors[i]][pred_class]))
+
+    original = load_img('{}/{}'.format(validation_dir, fnames[errors[i]]))
+    plt.imshow(original)
+    plt.show()
+'''
