@@ -57,7 +57,7 @@ With more time, I would take a look at which images the errors are occurring for
 
 It could just be the foreign object category with all the issues. Or, it could be different lighting conditions or different phases of the crop cycle between different videos, which could be improved with more data. Or, it could be confusion caused by objects in the background, which could mean a need for different bounding box method. 
 
-## SECOND PART
+## SECOND RUN
 ### description
 I tried applying transfer learning using a ResNet50 pretrained on ImageNet to classify 3 labels: [brown leaf, green leaf, stem] but haven’t been getting good results. The highest evaluation accuracy the model achieved was 48% accuracy (hardly better than a random 33%), which was achieved with a low learning rate and training until accuracy or loss began dropping due to overfitting.
 
