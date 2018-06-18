@@ -41,6 +41,8 @@ Though you mentioned this to me before, I was still surprised that ’ear’ was
 Most of the predictions are of organisms found in nature. I’m not sure if this is more a reflection of the nature in my dataset or a result of the ResNet model (from the amount of nature categories on the imagenet dataset)
 
 ## transfer.py
+
+## FIRST RUN, PROBLEM WITH CODE SO NOT SURE IF RESULTS ARE RELIABLE
 ### description
 transfer.py implements transfer learning. Essentially, it takes a pre-trained ResNet50 model, and replaces the final fully connected and output layers with two new, untrained layers. The original model had a fully connected layer with 2048 neurons but I took it down to 512 neurons because we only need output neurons instead of 1000.  Only these last two layers are trained, since the idea is that the pre-trained network has already learned the relevant features. Training all 50 layers usually gives better results, but I did not have the computational power or time to do that. 
 
@@ -54,6 +56,29 @@ Out of all the instances, the best results achieved was an evaluation accuracy o
 With more time, I would take a look at which images the errors are occurring for and how the network was wrong to evaluate the cause for the errors. 
 
 It could just be the foreign object category with all the issues. Or, it could be different lighting conditions or different phases of the crop cycle between different videos, which could be improved with more data. Or, it could be confusion caused by objects in the background, which could mean a need for different bounding box method. 
+
+## SECOND PART
+### description
+I tried applying transfer learning using a ResNet50 pretrained on ImageNet to classify 3 labels: [brown leaf, green leaf, stem] but haven’t been getting good results. The highest evaluation accuracy the model achieved was 48% accuracy (hardly better than a random 33%), which was achieved with a low learning rate and training until accuracy or loss began dropping due to overfitting.
+
+Architecture:
+[224x224] image > Pretrained ResNet50* > untrained FC layer > output (3 neurons)
+*without output or final fully connected layer
+
+### results
+see transfer_results.png
+
+### evaluation
+Here are some possibilities for why it’s performing so poorly, since I can’t seem to find hyper-parameters to get eval_acc above 50%
+
+   1. Needs more data
+The training and evaluation set both contain only 250-300 images total. This is nowhere near the amount of data used by other recent DL models. It’s also worth noting that despite the training and evaluation data coming from separate videos, the lighting in those two videos is quite similar and doesn’t represent the expected training domain. Lack of data certainly is one of the issues, just not sure how much it contributes
+   2. Transfer learning won’t work
+The pretrained ResNet50 model likely contains heaps of irrelevant features, since ImageNet covers a broader domain than just images of corn. This could make training slow, noisy and generally difficult. Perhaps a model trained specifically for our domain is necessary
+   3. Data needs improvement
+Since training data is cropped from individual frames based on our annotations, training images don’t have consistent dimensions and are scaled to be 224x224, which inconsistently and drastically distorts images
+   4. Misc 
+I haven’t tried using other optimizers or changing the size of the untrained FC layer or how training data is sampled yet
 
 ### appendix
 
